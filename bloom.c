@@ -115,7 +115,7 @@ int main() {
         perror("Error opening rockyou file");
         exit(EXIT_FAILURE);
     }
-    char **rockyou_words = malloc(sizeof(char*) * 1000000);  // Example size
+    char **rockyou_words = malloc(sizeof(char*) * 139836133);  // Example size
     size_t rockyou_count = 0;
     char line[256];
     while (fgets(line, sizeof(line), rockyou_fp)) {
