@@ -97,19 +97,17 @@ void test_dictionary(const char *file_path, BloomFilter *filter, Results *result
 		if (check_bloom_filter(filter, line)) {
 			if (is_in_rockyou) {
 				results->true_positive++;
-				printf("maybe\n");
 			} else {
 				results->false_positive++;
-				printf("maybe\n");
 			}
+			printf("maybe\n");
 		} else {
 			if (is_in_rockyou) {
 				results->false_negative++;
-				printf("no\n");
 			} else {
 				results->true_negative++;
-				printf("no\n");
 			}
+			printf("no\n");
 		}
 	}
 	fclose(file);

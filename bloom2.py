@@ -35,11 +35,13 @@ def test_dictionary(file_path, bloom_filter):
                     results['true_positive'] += 1
                 else:
                     results['false_positive'] += 1
+				print("maybe\n")
             else:
                 if word in rockyou_words:
                     results['false_negative'] += 1
                 else:
                     results['true_negative'] += 1
+				print("no\n")
     return results
 
 rockyou_file = 'rockyou.ISO-8859-1.txt'
