@@ -117,7 +117,7 @@ int main() {
 	const char *rockyou_file = "rockyou.ISO-8859-1.txt";
 	const char *dictionary_file = "dictionary.txt";
 
-	BloomFilter *bloom_filter = create_bloom_filter(54833160, 6);
+	BloomFilter *bloom_filter = create_bloom_filter(54833160, 4);
 	load_bloom_filter(rockyou_file, bloom_filter);
 
 	FILE *rockyou_fp = fopen(rockyou_file, "r");
