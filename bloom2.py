@@ -31,17 +31,17 @@ def test_dictionary(file_path, bloom_filter):
         for line in file:
             word = line.strip()
             if bloom_filter.check(word):
-                if word in rockyou_words:  # Assume rockyou_words is a set of all words in rockyou.txt
+                if word in rockyou_words:
                     results['true_positive'] += 1
                 else:
                     results['false_positive'] += 1
-                print("maybe\n")
+                print("maybe")
             else:
                 if word in rockyou_words:
                     results['false_negative'] += 1
                 else:
                     results['true_negative'] += 1
-                print("no\n")
+                print("no")
     return results
 
 rockyou_file = 'rockyou.ISO-8859-1.txt'
@@ -51,7 +51,7 @@ bloom_filter = BloomFilter(size=54833160, hash_count=4)
 # Load the rockyou.txt file into the bloom filter
 load_bloom_filter(rockyou_file, bloom_filter)
 
-# Load rockyou words into a set for accurate testing
+# Load rockyou words into a set
 with open(rockyou_file, 'r', encoding='ISO-8859-1') as file:
     rockyou_words = set(file.read().splitlines())
 
