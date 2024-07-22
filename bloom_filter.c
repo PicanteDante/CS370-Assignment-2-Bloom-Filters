@@ -17,7 +17,7 @@ BloomFilter* create_bloom_filter(size_t size, int hash_count) {
 	}
 	filter->size = size;
 	filter->hash_count = hash_count;
-	filter->bit_array = (unsigned char*)calloc((size + 7) / 8, sizeof(unsigned char)); // Ensure we allocate enough bytes
+	filter->bit_array = (unsigned char*)calloc((size + 7) / 8, sizeof(unsigned char));
 	if (!filter->bit_array) {
 		perror("Error allocating memory for bit array");
 		free(filter);
@@ -119,7 +119,7 @@ int main() {
 	const char *rockyou_file = "rockyou.ISO-8859-1.txt";
 	const char *dictionary_file = "dictionary.txt";
 
-	BloomFilter *bloom_filter = create_bloom_filter(54833160, 61);
+	BloomFilter *bloom_filter = create_bloom_filter(54833160, 6);
 	load_bloom_filter(rockyou_file, bloom_filter);
 
 	FILE *rockyou_fp = fopen(rockyou_file, "r");

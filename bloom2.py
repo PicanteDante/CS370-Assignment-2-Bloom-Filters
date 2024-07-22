@@ -44,7 +44,7 @@ def test_dictionary(file_path, bloom_filter):
 
 rockyou_file = 'rockyou.ISO-8859-1.txt'
 dictionary_file = 'dictionary.txt'
-bloom_filter = BloomFilter(size=54833160, hash_count=61)
+bloom_filter = BloomFilter(size=54833160, hash_count=4)
 
 # Load the rockyou.txt file into the bloom filter
 load_bloom_filter(rockyou_file, bloom_filter)
