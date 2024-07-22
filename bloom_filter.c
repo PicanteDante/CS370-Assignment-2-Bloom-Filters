@@ -11,9 +11,18 @@ typedef struct {
 
 BloomFilter* create_bloom_filter(size_t size, int hash_count) {
 	BloomFilter *filter = (BloomFilter*)malloc(sizeof(BloomFilter));
+	if (!filter) {
+		perror("Error allocating memory for BloomFilter");
+		exit(EXIT_FAILURE);
+	}
 	filter->size = size;
 	filter->hash_count = hash_count;
-	filter->bit_array = (unsigned char*)calloc(size, sizeof(unsigned char));
+	filter->bit_array = (unsigned char*)calloc((size + 7) / 8, sizeof(unsigned char)); // Ensure we allocate enough bytes
+	if (!filter->bit_array) {
+		perror("Error allocating memory for bit array");
+		free(filter);
+		exit(EXIT_FAILURE);
+	}
 	return filter;
 }
 
@@ -88,14 +97,18 @@ void test_dictionary(const char *file_path, BloomFilter *filter, Results *result
 		if (check_bloom_filter(filter, line)) {
 			if (is_in_rockyou) {
 				results->true_positive++;
+				printf("maybe\n");
 			} else {
 				results->false_positive++;
+				printf("maybe\n");
 			}
 		} else {
 			if (is_in_rockyou) {
 				results->false_negative++;
+				printf("no\n");
 			} else {
 				results->true_negative++;
+				printf("no\n");
 			}
 		}
 	}
@@ -109,18 +122,35 @@ int main() {
 	BloomFilter *bloom_filter = create_bloom_filter(54833160, 61);
 	load_bloom_filter(rockyou_file, bloom_filter);
 
-	// Load rockyou words into memory for accurate testing
 	FILE *rockyou_fp = fopen(rockyou_file, "r");
 	if (!rockyou_fp) {
 		perror("Error opening rockyou file");
 		exit(EXIT_FAILURE);
 	}
 	char **rockyou_words = malloc(sizeof(char*) * 623517);
+	if (!rockyou_words) {
+		perror("Error allocating memory for rockyou words");
+		fclose(rockyou_fp);
+		free(bloom_filter->bit_array);
+		free(bloom_filter);
+		exit(EXIT_FAILURE);
+	}
 	size_t rockyou_count = 0;
 	char line[256];
-	while (fgets(line, sizeof(line), rockyou_fp)) {
+	while (fgets(line, sizeof(line), rockyou_fp) && rockyou_count < 623517) {
 		line[strcspn(line, "\r\n")] = 0;
 		rockyou_words[rockyou_count] = strdup(line);
+		if (!rockyou_words[rockyou_count]) {
+			perror("Error duplicating string");
+			fclose(rockyou_fp);
+			free(bloom_filter->bit_array);
+			free(bloom_filter);
+			for (size_t i = 0; i < rockyou_count; ++i) {
+				free(rockyou_words[i]);
+			}
+			free(rockyou_words);
+			exit(EXIT_FAILURE);
+		}
 		rockyou_count++;
 	}
 	fclose(rockyou_fp);
