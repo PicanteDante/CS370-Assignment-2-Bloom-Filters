@@ -1,0 +1,47 @@
+walk me through this task. Note that 'rockyou.ISO-8859-1.txt' is a massive text file with tons of weak passwords, which will be used to check 'dictionary.txt'. 
+
+'dictionary.txt' and 'rockyou.ISO-8859-1.txt' have one word entry per line.
+
+The software will implement a Bloom filter.
+Bloom filter will be loaded with values from rockyou.txt.
+The software will automate the testing of values in dictionary.txt.
+The software will calculate and display statistics on true positive, true negative, false positive, and false negative for the dictionary.txt based on the rockyou.txt.
+The software will print "maybe" each time the filter thinks an entry is present in 'dictionary.txt' and will print "no" each time it thinks the entry is not present.
+The program will be written in c.
+
+Statistics will be printed at the end with something like:
+```printf("True Positives: %d\n", results.true_positive);
+printf("True Negatives: %d\n", results.true_negative);
+printf("False Positives: %d\n", results.false_positive);
+printf("False Negatives: %d\n", results.false_negative);```
+
+
+Files:
+
+rockyou.ISO-8859-1.txt
+dictionary.txt
+sample_output.txt (provided so you can see what the output will look like)
+
+
+Design Considerations (explain answers briefly)
+Decide how big of a bit array you will use and understand the impact of such a decision.
+Decide how many hashing algorithms you will use and understand the impact of such a decision.
+Understand the difference between true positive, true negative, false positive, and false negative in relation to the results of a Bloom Filter.
+Check out the runtime difference between using a List and a SortedSet when you are comparing which values in dictionary.txt are in rockyou.txt (re: reference statistics).
+
+
+
+Additional Information:
+
+#define DICTIONARY_CHARS 6854139
+#define DICTIONARY_LINES 623517
+#define ROCKYOU_CHARS 139836133
+#define ROCKYOU_LINES 14344391
+
+
+
+The dictionary.txt file is ANSI encoded. So when you read it, use one of the following encoding types:
+latin-1
+ISO-8859-1
+windows-1252
+The sample input and output files are not meant to be correlated. They are simply independent examples of input and output.

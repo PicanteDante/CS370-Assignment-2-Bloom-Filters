@@ -3,11 +3,24 @@
 #include <string.h>
 #include <openssl/md5.h>
 
+
+#define DICT_CHARS 6854139
+#define DICT_LINES 623517
+#define ROCKYOU_CHARS 139836133
+#define ROCKYOU_LINES 14344391
+
 typedef struct {
 	unsigned char *bit_array;
 	size_t size;
 	int hash_count;
 } BloomFilter;
+
+typedef struct {
+	int true_positive;
+	int true_negative;
+	int false_positive;
+	int false_negative;
+} Results;
 
 BloomFilter* create_bloom_filter(size_t size, int hash_count) {
 	BloomFilter *filter = (BloomFilter*)malloc(sizeof(BloomFilter));
@@ -71,12 +84,6 @@ void load_bloom_filter(const char *file_path, BloomFilter *filter) {
 	fclose(file);
 }
 
-typedef struct {
-	int true_positive;
-	int true_negative;
-	int false_positive;
-	int false_negative;
-} Results;
 
 void test_dictionary(const char *file_path, BloomFilter *filter, Results *results, const char **rockyou_words, size_t rockyou_count) {
 	FILE *file = fopen(file_path, "r");
