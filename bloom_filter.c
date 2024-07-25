@@ -3,16 +3,19 @@
 #include <string.h>
 #include <openssl/md5.h>
 
+/*
+ * For baller performance, use:
+ * BLOOM_SIZE 481221388
+ # HASH_COUNT 23
+ */
 
-#define DICT_CHARS 6854139
-#define DICT_LINES 623517
-#define ROCKYOU_CHARS 139836133
-#define ROCKYOU_LINES 14344391
+#define BLOOM_SIZE 481221388
+#define HASH_COUNT 23
+#define MAX_LINE_LENGTH 256
+#define HASH_TABLE_SIZE 16777216  // 2^24
 
 typedef struct {
-	unsigned char *bit_array;
-	size_t size;
-	int hash_count;
+	unsigned char *array;
 } BloomFilter;
 
 typedef struct {
@@ -22,159 +25,150 @@ typedef struct {
 	int false_negative;
 } Results;
 
-BloomFilter* create_bloom_filter(size_t size, int hash_count) {
-	BloomFilter *filter = (BloomFilter*)malloc(sizeof(BloomFilter));
-	if (!filter) {
-		perror("Error allocating memory for BloomFilter");
-		exit(EXIT_FAILURE);
+typedef struct WordEntry {
+	char *word;
+	struct WordEntry *next;
+} WordEntry;
+
+WordEntry *hash_table[HASH_TABLE_SIZE] = {NULL};
+
+// Bloom filter functions
+void bloom_init(BloomFilter *filter) {
+	filter->array = calloc(BLOOM_SIZE / 8, 1);
+	if (filter->array == NULL) {
+		fprintf(stderr, "Failed to allocate memory for Bloom filter\n");
+		exit(1);
 	}
-	filter->size = size;
-	filter->hash_count = hash_count;
-	filter->bit_array = (unsigned char*)calloc((size + 7) / 8, sizeof(unsigned char));
-	if (!filter->bit_array) {
-		perror("Error allocating memory for bit array");
-		free(filter);
-		exit(EXIT_FAILURE);
-	}
-	return filter;
 }
 
-unsigned int hash_md5(const char *str, int seed) {
+void bloom_free(BloomFilter *filter) {
+	free(filter->array);
+}
+
+unsigned int hash(const unsigned char *str, unsigned int seed) {
 	unsigned char digest[MD5_DIGEST_LENGTH];
-	char temp_str[256];
-	snprintf(temp_str, sizeof(temp_str), "%s%d", str, seed);
-	MD5((unsigned char*)temp_str, strlen(temp_str), digest);
-	unsigned int hash = 0;
-	for (int i = 0; i < 4; ++i) {
-		hash = (hash << 8) | digest[i];
-	}
-	return hash;
+	MD5_CTX ctx;
+	MD5_Init(&ctx);
+	MD5_Update(&ctx, str, strlen((char *)str));
+	MD5_Update(&ctx, &seed, sizeof(seed));
+	MD5_Final(digest, &ctx);
+	
+	return *(unsigned int*)digest;
 }
 
-void add_to_bloom_filter(BloomFilter *filter, const char *item) {
-	for (int i = 0; i < filter->hash_count; ++i) {
-		unsigned int hash = hash_md5(item, i);
-		size_t index = hash % filter->size;
-		filter->bit_array[index / 8] |= (1 << (index % 8));
+void bloom_add(BloomFilter *filter, const char *str) {
+	for (int i = 0; i < HASH_COUNT; i++) {
+		unsigned int index = hash((unsigned char *)str, i) % BLOOM_SIZE;
+		filter->array[index / 8] |= 1 << (index % 8);
 	}
 }
 
-int check_bloom_filter(BloomFilter *filter, const char *item) {
-	for (int i = 0; i < filter->hash_count; ++i) {
-		unsigned int hash = hash_md5(item, i);
-		size_t index = hash % filter->size;
-		if (!(filter->bit_array[index / 8] & (1 << (index % 8)))) {
+int bloom_check(BloomFilter *filter, const char *str) {
+	for (int i = 0; i < HASH_COUNT; i++) {
+		unsigned int index = hash((unsigned char *)str, i) % BLOOM_SIZE;
+		if (!(filter->array[index / 8] & (1 << (index % 8)))) {
 			return 0;
 		}
 	}
 	return 1;
 }
 
-void load_bloom_filter(const char *file_path, BloomFilter *filter) {
-	FILE *file = fopen(file_path, "r");
-	if (!file) {
-		perror("Error opening file");
-		exit(EXIT_FAILURE);
-	}
-	char line[256];
-	while (fgets(line, sizeof(line), file)) {
-		line[strcspn(line, "\r\n")] = 0;
-		add_to_bloom_filter(filter, line);
-	}
-	fclose(file);
+// Hash table functions
+unsigned int hash_string(const char *str) {
+	unsigned char digest[MD5_DIGEST_LENGTH];
+	MD5((unsigned char*)str, strlen(str), digest);
+	return *(unsigned int*)digest % HASH_TABLE_SIZE;
 }
 
-
-void test_dictionary(const char *file_path, BloomFilter *filter, Results *results, const char **rockyou_words, size_t rockyou_count) {
-	FILE *file = fopen(file_path, "r");
-	if (!file) {
-		perror("Error opening file");
-		exit(EXIT_FAILURE);
-	}
-	char line[256];
-	while (fgets(line, sizeof(line), file)) {
-		line[strcspn(line, "\r\n")] = 0;
-		int is_in_rockyou = 0;
-		for (size_t i = 0; i < rockyou_count; ++i) {
-			if (strcmp(rockyou_words[i], line) == 0) {
-				is_in_rockyou = 1;
-				break;
-			}
-		}
-		if (check_bloom_filter(filter, line)) {
-			if (is_in_rockyou) {
-				results->true_positive++;
-			} else {
-				results->false_positive++;
-			}
-			printf("maybe\n");
-		} else {
-			if (is_in_rockyou) {
-				results->false_negative++;
-			} else {
-				results->true_negative++;
-			}
-			printf("no\n");
-		}
-	}
-	fclose(file);
+void add_word(const char *word) {
+	unsigned int index = hash_string(word);
+	WordEntry *new_entry = malloc(sizeof(WordEntry));
+	new_entry->word = strdup(word);
+	new_entry->next = hash_table[index];
+	hash_table[index] = new_entry;
 }
 
+int check_word(const char *word) {
+	unsigned int index = hash_string(word);
+	WordEntry *entry = hash_table[index];
+	while (entry != NULL) {
+		if (strcmp(entry->word, word) == 0) {
+			return 1;
+		}
+		entry = entry->next;
+	}
+	return 0;
+}
+
+void free_hash_table() {
+	for (int i = 0; i < HASH_TABLE_SIZE; i++) {
+		WordEntry *entry = hash_table[i];
+		while (entry != NULL) {
+			WordEntry *temp = entry;
+			entry = entry->next;
+			free(temp->word);
+			free(temp);
+		}
+	}
+}
+
+// Main function
 int main() {
-	const char *rockyou_file = "rockyou.ISO-8859-1.txt";
-	const char *dictionary_file = "dictionary.txt";
+	BloomFilter filter;
+	bloom_init(&filter);
+	Results results = {0};
 
-	BloomFilter *bloom_filter = create_bloom_filter(54833160, 4);
-	load_bloom_filter(rockyou_file, bloom_filter);
+	// Load rockyou.txt into Bloom filter and hash table
+	FILE *rockyou = fopen("rockyou.ISO-8859-1.txt", "r");
+	if (rockyou == NULL) {
+		fprintf(stderr, "Failed to open rockyou.ISO-8859-1.txt\n");
+		return 1;
+	}
 
-	FILE *rockyou_fp = fopen(rockyou_file, "r");
-	if (!rockyou_fp) {
-		perror("Error opening rockyou file");
-		exit(EXIT_FAILURE);
+	char line[MAX_LINE_LENGTH];
+	while (fgets(line, sizeof(line), rockyou)) {
+		line[strcspn(line, "\n")] = 0;
+		bloom_add(&filter, line);
+		add_word(line);
 	}
-	char **rockyou_words = malloc(sizeof(char*) * 623517);
-	if (!rockyou_words) {
-		perror("Error allocating memory for rockyou words");
-		fclose(rockyou_fp);
-		free(bloom_filter->bit_array);
-		free(bloom_filter);
-		exit(EXIT_FAILURE);
+	fclose(rockyou);
+
+	// Process dictionary.txt
+	FILE *dictionary = fopen("dictionary.txt", "r");
+	if (dictionary == NULL) {
+		fprintf(stderr, "Failed to open dictionary.txt\n");
+		bloom_free(&filter);
+		free_hash_table();
+		return 1;
 	}
-	size_t rockyou_count = 0;
-	char line[256];
-	while (fgets(line, sizeof(line), rockyou_fp) && rockyou_count < 623517) {
-		line[strcspn(line, "\r\n")] = 0;
-		rockyou_words[rockyou_count] = strdup(line);
-		if (!rockyou_words[rockyou_count]) {
-			perror("Error duplicating string");
-			fclose(rockyou_fp);
-			free(bloom_filter->bit_array);
-			free(bloom_filter);
-			for (size_t i = 0; i < rockyou_count; ++i) {
-				free(rockyou_words[i]);
-			}
-			free(rockyou_words);
-			exit(EXIT_FAILURE);
+
+	while (fgets(line, sizeof(line), dictionary)) {
+		line[strcspn(line, "\n")] = 0;
+		int bloom_result = bloom_check(&filter, line);
+		int actual_present = check_word(line);
+
+		if (bloom_result) {
+			printf("maybe\n");
+			if (actual_present) results.true_positive++;
+			else results.false_positive++;
+		} else {
+			printf("no\n");
+			if (actual_present) results.false_negative++;
+			else results.true_negative++;
 		}
-		rockyou_count++;
 	}
-	fclose(rockyou_fp);
+	fclose(dictionary);
 
-	Results results = {0, 0, 0, 0};
-	test_dictionary(dictionary_file, bloom_filter, &results, (const char **)rockyou_words, rockyou_count);
-
+	// Print statistics
 	printf("True Positives: %d\n", results.true_positive);
 	printf("True Negatives: %d\n", results.true_negative);
 	printf("False Positives: %d\n", results.false_positive);
 	printf("False Negatives: %d\n", results.false_negative);
 
-	// Free allocated memory
-	for (size_t i = 0; i < rockyou_count; ++i) {
-		free(rockyou_words[i]);
-	}
-	free(rockyou_words);
-	free(bloom_filter->bit_array);
-	free(bloom_filter);
+	// Clean up! Clean up! Everybody, Everywhere!
+	// Clean up! Clean up! Everybody do your share!
+	bloom_free(&filter);
+	free_hash_table();
 
 	return 0;
 }
