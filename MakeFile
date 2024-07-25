@@ -1,0 +1,6 @@
+all:
+	gcc -o bloom_filter bloom_filter.c -lssl -lcrypto
+
+clean:
+	rm -f bloom_filter
+
